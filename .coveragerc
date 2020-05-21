@@ -2,7 +2,13 @@
 source = minghu6
 
 [report]
-omit = email/*,gui/*.graphic/*,http/*,internet/*,security/*,tools/*
+omit = minghu6/email/*
+       minghu6/gui/*
+       minghu6/graphic/*
+       minghu6/http/*
+       minghu6/internet/*
+       minghu6/security/*
+       minghu6/tools/*
 exclude_lines =
     pragma: no cover
     def __repr__
