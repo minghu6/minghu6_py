@@ -1,16 +1,18 @@
 language: python
 python:
-- '3.8'
+  - '3.8'
+
+before_install:
+  - pip3 install coveralls
+  - pip3 install nose2[coverage_plugin]
 
 install:
 - pip3 install -r requirements.txt
-- pip3 install nose2[coverage_plugin]
-- pip3 install coveralls
 
 script: coverage run -m nose2
 sudo: false
 after_success:
-  coveralls
+  coverage report &&  coveralls
 deploy:
   provider: pypi
   user: minghu6
