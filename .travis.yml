@@ -4,6 +4,7 @@ python:
 
 before_install:
   - pip install nose2[coverage_plugin]>=0.6.5
+  - pip install coveralls
 
 install:
 - pip install -r requirements.txt
