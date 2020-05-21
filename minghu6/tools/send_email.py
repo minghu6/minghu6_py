@@ -21,8 +21,8 @@ Options:
 
 from docopt import docopt
 from minghu6.etc.cmd import env_sep
-from minghu6.email import EmailSender
-#from minghu6.internet.email_test import EmailSender
+#from minghu6.email import EmailSender
+from minghu6.internet.email_test import EmailSender
 
 
 def cli():

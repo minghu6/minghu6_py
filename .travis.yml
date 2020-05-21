@@ -6,7 +6,7 @@ install:
 - pip3 install -r requirements.txt
 - pip3 install nose2
 - pip3 install coveralls
-script: coverage run setup.py test
+script: coverage run -m nose2
 sudo: false
 after_success:
   coveralls
