@@ -8,8 +8,6 @@ install:
 - pip3 install coveralls
 script: coverage run -m nose2
 sudo: false
-after_success:
-  coveralls
 deploy:
   provider: pypi
   user: minghu6
