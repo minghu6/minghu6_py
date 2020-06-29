@@ -14,12 +14,13 @@ Usage:
   ffmpeg_fix merge va    <videoname> <audioname> --output=<output>
   ffmpeg_fix merge vs    <videoname> <subtitlename> --output=<output>
   ffmpeg_fix merge gif   <pattern>   --framerate=<framerate> --output=<output> [--prefix]
-  ffmpeg_fix cut <filename> <start-time> <end-time> --output=<output> [--debug]
+  ffmpeg_fix cut <filename> <start-time> <end-time> [--output=<output>] [--debug]
   ffmpeg_fix extract audio <filename> --output=<output>
   ffmpeg_fix extract video <filename> --output=<output>
   ffmpeg_fix extract subtitle <filename> --output=<output>
   ffmpeg_fix extract frame <filename> <start-time> --output=<output>
   ffmpeg_fix compress video <pattern>... [--preset=<preset>] [--crf=<crf>] [--output-postfix=<output_postfix>]
+  ffmpeg_fix trim <title-type> <pattern>...
 
 Options:
   info                  view the info of the file.
@@ -29,10 +30,12 @@ Options:
   compress              compress video, output type is mp4
   va                    video and audio
   vs                    video and subtitle
+  trim                  trim fixed title for video
   <pattern>             pattern of video name, such as "p_*" (p_1.mp4, p_2.mp4, p_3.mp4)
                         Only support name without path.
   <start-time>          video start time, 0 means 00:00:00
   <end-time>            video end time, such as xx:yy:zz, xxx:yy:zz, support placeholder `end` means for video end
+  <title-type>          title type
 
   -f --format=<format>  to format such as `mp4`
   -o --output=<output>  ouput file
@@ -56,6 +59,7 @@ import os
 import sys
 import multiprocessing
 import io
+import datetime
 
 from collections import namedtuple
 from contextlib import redirect_stdout
@@ -72,13 +76,20 @@ from minghu6.etc.path import add_postfix
 from minghu6.etc.path2uuid import path2uuid, Path2UUID
 from minghu6.io.stdio import askyesno
 from minghu6.math.prime import simpleist_int_ratio
-from minghu6.algs.operator import getitem
+from minghu6.algs.operator import getone
 from pprint import pprint
 
 context = decimal.getcontext()  # 获取decimal现在的上下文
 context.rounding = decimal.ROUND_05UP
 CORE_NUM = multiprocessing.cpu_count()
 PRESET_SET = {'ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow', 'placebo'}
+TITLE_TYPE_DICT = {'pornhub': 5}
+
+def inplace_output(fn):
+    suffix = str(datetime.datetime.now())
+    base, ext = os.path.splitext(fn)
+
+    return path2uuid(base + suffix + ext, rename=False, quiet=True)
 
 
 def assert_output_has_ext(fn):
@@ -105,12 +116,12 @@ def video_time_sec2str(sec):
 
     if spec_hour != 0:
         s += '%d:' % spec_hour
-    
+
     if spec_min != 0:
         s += '%d:' % spec_min
     elif spec_hour != 0:
         s += '00:'
-    
+
     s += '%d' % spec_sec
 
     return s
@@ -134,7 +145,7 @@ def load_fps_from_json(json_obj):
     frame_rate = json_obj['streams'][video_site]['avg_frame_rate']
     fraction, denominator = frame_rate.split('/')
     frame_rate = int(fraction) / int(denominator)
-    
+
     return frame_rate
 
 
@@ -157,34 +168,34 @@ def get_video_audio_info_site_injson(json_obj):
             audio_site = i
         if stream['avg_frame_rate'] != '0/0':
             video_site = i
-    
+
     return video_site, audio_site
 
 
 def info(fn, list_all=False):
     json_obj = load_video_info_json(fn)
-    
+
     if not list_all:
         def video_info(json_obj):
             video_site, audio_site = get_video_audio_info_site_injson(json_obj)
             filename = json_obj['format']['filename']
-            
+
             size = json_obj['format']['size']
-    
+
             bit_rate = json_obj['format']['bit_rate']
             frame_rate = load_fps_from_json(json_obj)
-            
+
             width = json_obj['streams'][video_site]['width']
             height = json_obj['streams'][video_site]['height']
             resolution = '%sx%s' % (width, height)
             ratio_tuple = simpleist_int_ratio(width, height)
-            
+
             format_name = json_obj['format']['format_name']
             format_long_name = json_obj['format']['format_long_name']
-            
+
             codec_name = json_obj['streams'][video_site]['codec_name']
             codec_long_name = json_obj['streams'][video_site]['codec_long_name']
-            
+
             audio_codec_name = json_obj['streams'][audio_site]['codec_name']
             audio_tag_string = json_obj['streams'][audio_site]['codec_tag_string']
             audio_channels = json_obj['streams'][audio_site]['channels']
@@ -206,22 +217,22 @@ def info(fn, list_all=False):
             color.print_info('audio_channels:   %s' % audio_channels)
             color.print_info()
             color.print_info('duration:         %s' % duration)
-        
+
         def audio_info(json_obj):
             video_site, audio_site = get_video_audio_info_site_injson(json_obj)
-            
+
             filename = json_obj['format']['filename']
             size = json_obj['format']['size']
-            
+
             format_name = json_obj['format']['format_name']
             format_long_name = json_obj['format']['format_long_name']
-            
+
             codec_name = json_obj['streams'][audio_site]['codec_name']
             codec_long_name = json_obj['streams'][audio_site]['codec_long_name']
-            
+
             bit_rate = json_obj['streams'][audio_site]['bit_rate']
             sample_rate = json_obj['streams'][audio_site]['sample_rate']
-            
+
             color.print_info('filename:         %s' % filename)
             color.print_info('size:             %.1f Mb' % (int(size) / (1024 * 1024)))
             color.print_info('bit_rate:         %d Kb/s' % (int(bit_rate) / 1000))
@@ -230,18 +241,18 @@ def info(fn, list_all=False):
             color.print_info('format_long_name: %s' % format_long_name)
             color.print_info('codec_name:       %s' % codec_name)
             color.print_info('codec_long_name:  %s' % codec_long_name)
-        
+
         try:
             video_info(json_obj)
         except:
             audio_info(json_obj)
-    
+
     else:
-        
+
         buf = io.StringIO()
         with redirect_stdout(buf):
             pprint(json_obj)
-        
+
         color.print_info(buf.getvalue())
 
 
@@ -249,7 +260,7 @@ def convert(fn, output, size: str = None, rate: (int, float) = None, fps: (int, 
     if not assert_output_has_ext(output):
         color.print_err('Failed.')
         return
-    
+
     fn_tmp = path2uuid(fn, quiet=True)
     output_tmp = path2uuid(output, quiet=True, rename=False)
     try:
@@ -264,7 +275,7 @@ def convert(fn, output, size: str = None, rate: (int, float) = None, fps: (int, 
             cmd_list.insert(1, '-r')
             cmd_list.insert(2, str(source_fps))
             need_convert = True
-        
+
         if size is not None:
             width = json_obj['streams'][video_site]['width']
             height = json_obj['streams'][video_site]['height']
@@ -275,7 +286,7 @@ def convert(fn, output, size: str = None, rate: (int, float) = None, fps: (int, 
                 cmd_list.append('-s')
                 cmd_list.append(size)
                 need_convert = True
-        
+
         if fps is not None:
             origin_fps = round(load_fps_from_json(json_obj), 3)
             if round(fps, 3) != origin_fps:
@@ -284,19 +295,19 @@ def convert(fn, output, size: str = None, rate: (int, float) = None, fps: (int, 
                 color.print_info('convert fps from %f to %f' % (origin_fps,
                                                                 fps))
                 need_convert = True
-        
+
         _, ext_i = os.path.splitext(fn)
         _, ext_out = os.path.splitext(output)
         if ext_i != ext_out:
             need_convert = True
-        
+
         if need_convert:
             cmd_list.append(output_tmp)
-            for line in CommandRunner.run(' '.join(cmd_list)):
+            for _, line in CommandRunner.run(' '.join(cmd_list)):
                 print(line)
         else:
             os.rename(fn_tmp, output_tmp)
-        
+
         path2uuid(output_tmp, d=True)
     except Exception as ex:
         path2uuid(output_tmp, d=True, rename=False)
@@ -329,42 +340,42 @@ def merge(pattern_list, output, type, **other_kwargs):
                         merge_file_list.append(fn)
     else:  # 'va', 'vs
         merge_file_list = pattern_list
-    
+
     # common_prefix_pattern = r'^(\w)+\+$'
     if isprefix and len(pattern_list) == 1:
         def key(fn):
             base = os.path.splitext(os.path.basename(fn))[0]
-            guessed_version_string = getitem(base.split(pattern_list[0]), 1, '0')
+            guessed_version_string = getone(base.split(pattern_list[0]), 1, default='0')
             if guessed_version_string == '':
                 guessed_version_string = '0'
             v = LooseVersion(guessed_version_string)
-            
+
             return v
     elif type in ('va', 'vs'):
         key = lambda x: 0
     else:
         key = lambda fn: fn
-    
+
     try:
         merge_file_list = sorted(merge_file_list, key=key)
     except TypeError:
         color.print_warn(merge_file_list)
         raise
-    
+
     color.print_info('The following file will be merged in order')
     for i, file_to_merge in enumerate(merge_file_list):
         color.print_info('%3d. %s' % (i, file_to_merge))
-    
+
     if len(merge_file_list) <= 1:
         color.print_info('Do nothing.')
         return
     args = input('press enter to continue, q to quit\n')
     if args in ('q', 'Q'):
         return
-    
+
     merge_file_tmp_list = list(map(lambda x: path2uuid(x, quiet=True), merge_file_list))
     merge_file_tmp_list2 = []
-    
+
     if type == 'video':
         # check if the video can be merge
         FileInfo = namedtuple('FileInfo', ['width', 'height'])
@@ -375,79 +386,79 @@ def merge(pattern_list, output, type, **other_kwargs):
             codec_name = json_obj['streams'][video_site]['codec_name']
             width = int(json_obj['streams'][video_site]['width'])
             height = int(json_obj['streams'][video_site]['height'])
-            
+
             merge_file_info_list.append(FileInfo(width, height))
-        
+
         if not each_same(merge_file_info_list, key=lambda x: (x.width, x.height)):
             color.print_err('width, height, should be same of all video')
-            
+
             min_width = sorted(merge_file_info_list, key=lambda x: x.width)[0].width
             min_height = sorted(merge_file_info_list, key=lambda x: x.height)[0].height
             min_resolution = '%dx%d' % (min_width, min_height)
             min_fps = sorted(merge_file_info_list, key=lambda x: x.fps)[0].fps
-            
+
             color.print_warn('all_to_resolution: %s' % min_resolution)
             color.print_warn('all_to_fps: %s' % min_fps)
             if askyesno('convert to fix?'):
                 merge_file_tmp_list2 = list(map(lambda x: add_postfix(x, 'tmp'), merge_file_tmp_list))
-                
+
                 def tmp(fn_tuple):
                     convert(*fn_tuple, size=min_resolution, fps=min_fps)
-                
+
                 list(map(lambda x: tmp(x),
                          zip(merge_file_tmp_list, merge_file_tmp_list2)))
-            
+
             else:
-                
+
                 return
-    
+
     elif type == 'audio':
         pass
     elif type == 'va':
         pass
     elif type == 'gif':
         pass
-    
+
     output_tmp = path2uuid(output, rename=False, quiet=True)
     if len(merge_file_tmp_list2) == 0:
         input_file_list = merge_file_tmp_list
     else:
         input_file_list = merge_file_tmp_list2  # only for merge video
     try:
-        
+
         fw = open('.mylist', 'w')
         for fn in input_file_list:
             fw.write("file '%s' \n" % fn)
-        
+
         fw.close()
         if type in ('video', 'audio'):
             merge_cmd = 'ffmpeg -f concat -i %s -c copy %s' % ('.mylist', output_tmp)
         elif type == 'va':
             merge_cmd = 'ffmpeg -i %s -i %s -vcodec copy -acodec copy %s ' \
                         % (input_file_list[0], input_file_list[1], output_tmp)
-        
+
         elif type == 'vs':
             with open(input_file_list[1]) as f_subtitle:
                 encoding = guess_charset(f_subtitle)['encoding']
-            
+
             if encoding.lower() not in ('utf-8', 'ascii'):
                 info, err = exec_cmd('%s -m minghu6.tools.text convert %s utf-8'
                                      % (sys.executable, input_file_list[1]))
-                
+
                 if len(err) > 1 or err[0] != '':  # exec failed
                     color.print_err('error codec of the subtitle %s (need utf-8)')
-            
+
             merge_cmd = 'ffmpeg -i %s -vf subtitles=%s %s' \
                         % (input_file_list[0], input_file_list[1], output_tmp)
-        
+
         elif type == 'gif':
             framerate = other_kwargs['framerate']
             merge_cmd = 'ffmpeg -f image2 -framerate %d -i %s %s' \
                         % (int(framerate), '.mylist', output_tmp)
-        
-        for line in CommandRunner.run(merge_cmd):
+
+        for status, line in CommandRunner.run(merge_cmd):
             print(line)
-        
+
         path2uuid(output_tmp, d=True)
     except Exception:
         raise
@@ -458,18 +469,23 @@ def merge(pattern_list, output, type, **other_kwargs):
             os.remove('.mylist')
         except:
             pass
-        
+
         for fn in input_file_list:
             path2uuid(fn, d=True)
 
 
 def cut(fn, output, start_time, end_time, debug=False):
-    if not assert_output_has_ext(output):
-        color.print_err('Failed.')
-        return
-    
+    if output is None:
+        output_tmp = inplace_output(fn)
+    else:
+        if not assert_output_has_ext(output):
+            color.print_err('output must supply a ext name!')
+            return
+
+        output_tmp = path2uuid(output, rename=False, quiet=True)
+
+
     fn_tmp = path2uuid(fn)
-    output_tmp = path2uuid(output, rename=False, quiet=True)
     try:
         start_time_int = video_time_str2int(start_time)
         if end_time == 'end':
@@ -484,22 +500,27 @@ def cut(fn, output, start_time, end_time, debug=False):
             raise
 
         cmd = 'ffmpeg -ss %d -i "%s" -t %d -c:v copy -c:a copy "%s" ' \
-              % (start_time_int, fn_tmp, duration, output)
-        
-        info_lines, err_lines = exec_cmd(cmd)
-        if debug:
-            print(cmd)
-            print('Info: %s' % '\n'.join(err_lines))
-        
-        path2uuid(output_tmp, d=True, rename=False)
+              % (start_time_int, fn_tmp, duration, output_tmp)
+
+        for status, line in CommandRunner.run(cmd):
+            print(line)
+
+        if output:
+            path2uuid(output_tmp, d=True, rename=False)
+
     except Exception:
         raise
     else:
         color.print_ok('cut the video %s to %s from %s to %s'
                        % (fn, output, start_time, end_time))
-    
+
     finally:
-        path2uuid(fn_tmp, d=True)
+        if output:
+            path2uuid(fn_tmp, d=True)
+        else:
+            os.rename(output_tmp, fn)
+            path2uuid(fn_tmp, rename=False, d=True)
+            os.remove(fn_tmp)
 
 
 def extract(fn, output, type, **other_kwargs):
@@ -508,7 +529,7 @@ def extract(fn, output, type, **other_kwargs):
         return
     fn_tmp = path2uuid(fn, quiet=True)
     output_tmp = path2uuid(output, quiet=True, rename=False)
-    
+
     extract_cmd_list = ['ffmpeg', '-i', fn_tmp]
     if type == 'audio':
         extract_cmd_list.extend(['-acodec', 'copy', '-vn', output_tmp])
@@ -524,9 +545,9 @@ def extract(fn, output, type, **other_kwargs):
         color.print_err('error type: %s' % type)
         return
     # print(extract   _cmd_list)
-    for line in CommandRunner.run(' '.join(extract_cmd_list)):
+    for _, line in CommandRunner.run(' '.join(extract_cmd_list)):
         print(line)
-    
+
     path2uuid(fn_tmp, d=True)
     try:
         path2uuid(output_tmp, d=True)
@@ -574,7 +595,7 @@ def compress(pattern_list, output_postfix, media_type, **other_kwargs):
                                  '-crf', other_kwargs['crf'],
                                  output_tmp_file]
 
-            for line in CommandRunner.run(' '.join(compress_cmd_list)):
+            for _, line in CommandRunner.run(' '.join(compress_cmd_list)):
                 print(line)
 
 
@@ -594,20 +615,27 @@ def compress(pattern_list, output_postfix, media_type, **other_kwargs):
         list(map(color.print_ok, ok_info_list))
 
 
+def trim(pattern_list, start_time):
+    pass
+
+
+
+
 def cli():
     arguments = docopt(__doc__, version=minghu6.__version__)
-    
-    # output existed check
-    if arguments['--output']:
-        output = arguments['--output']
-        
-        if os.path.exists(output):
-            from minghu6.io.stdio import askoverride
 
-            if not askoverride(output, print_func=color.print_warn):
-                return
-            else:
-                os.remove(output)
+    # output existed check
+    # if arguments['--output']:
+    #     output = arguments['--output']
+
+    #     if os.path.exists(output):
+    #         from minghu6.io.stdio import askoverride
+
+    #         if not askoverride(output, print_func=color.print_warn):
+    #             return
+    #         else:
+    #             #os.remove(output)
+    #             pass
 
     if arguments['info']:
         fn = arguments['<filename>']
@@ -620,22 +648,22 @@ def cli():
         else:  # f
             f = arguments['--format']
             output = os.path.splitext(fn)[0] + '.' + f
-        
+
         if arguments['--fps'] is not None:
             fps = float(arguments['--fps'])
         else:
             fps = None
-        
+
         if arguments['--rate'] is not None:
             rate = float(arguments['--rate'])
         else:
             rate = None
-        
+
         size = arguments['--size']
         convert(fn, output, size=size, rate=rate, fps=fps)
-    
+
     elif arguments['merge']:
-        
+
         output = arguments['--output']
         isprefix = arguments['--prefix']
         other_kwargs = {'isprefix': isprefix}
@@ -654,15 +682,15 @@ def cli():
         elif arguments['vs']:
             type = 'vs'
             pattern = [arguments['<videoname>'], arguments['<subtitlename>']]
-        
+
         elif arguments['gif']:
             type = 'gif'
             pattern = arguments['<pattern>']
             frame_rate = arguments['--framerate']
             other_kwargs['framerate'] = frame_rate
-        
+
         merge(pattern, output, type, **other_kwargs)
-    
+
     elif arguments['cut']:
         fn = arguments['<filename>']
         start_time = arguments['<start-time>']
@@ -670,7 +698,7 @@ def cli():
         output = arguments['--output']
         debug = arguments['--debug']
         cut(fn, output, start_time, end_time, debug)
-    
+
     elif arguments['extract']:
         fn = arguments['<filename>']
         output = arguments['--output']
@@ -685,7 +713,7 @@ def cli():
         elif arguments['frame']:
             media_type = 'frame'
             other_kwargs['start-time'] = arguments['<start-time>']
-        
+
         extract(fn, output, media_type, **other_kwargs)\
 
     elif arguments['compress']:
@@ -706,6 +734,13 @@ def cli():
             other_kwargs['crf'] = arguments['--crf']
 
         compress(pattern, output_postfix, media_type, **other_kwargs)
+    elif arguments['trim']:
+        title_type = arguments['<title-type>']
+        pattern = arguments['<pattern>']
+
+        if title_type not in TITLE_TYPE_DICT:
+            color.print_err(f'Title type:{title_type} not found! It should be one of {TITLE_TYPE_DICT}')
+
 
 
 if __name__ == '__main__':

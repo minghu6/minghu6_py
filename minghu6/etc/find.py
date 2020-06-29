@@ -58,10 +58,10 @@ def findlist(pattern, startdir=os.curdir, dosort=False, regex_match=False):
 
 
 def find_wrapper(start_dir, pattern):
-        
+
     if not isiterable(pattern):
         pattern = [pattern]
-        
+
     command_runner = CommandRunner()
     if iswin():
         cmd = 'where /R "{start_dir}" {pattern}'.format(start_dir=start_dir, pattern=' '.join(pattern))
@@ -71,7 +71,7 @@ def find_wrapper(start_dir, pattern):
             pattern=' '.join(['-name "%s"' % each_pattern for each_pattern in pattern])
         )
 
-    for line in command_runner.run(cmd):
+    for _, line in command_runner.run(cmd):
         if os.path.exists(line):
             yield line
 

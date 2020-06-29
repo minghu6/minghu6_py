@@ -9,6 +9,7 @@ omit = minghu6/email/*
        minghu6/internet/*
        minghu6/security/*
        minghu6/tools/*
+       
 exclude_lines =
     pragma: no cover
     def __repr__

@@ -12,7 +12,7 @@ __all__ = ['datetime_fromstr']
 def datetime_fromstr(s, sep='-', sep_date_time=' '):
     """
     input format datetime str as follow
-    2017-01-02 22:12：53
+    2017-01-02 22:12:53
     2017-01-02 22:12
     2017-01-02
     """

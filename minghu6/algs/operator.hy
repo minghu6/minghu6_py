@@ -1,13 +1,17 @@
-(defn getitem [iterable index &optional default]
+(defn getone [&rest body &kwonly [default None]]
   (try
-    (get iterable index)
-    (except
-      [e [IndexError KeyError TypeError]]
-      (cond [(none? default) (raise e)]
-            [default]))))
+    (get #*body)
+    (except [_ [IndexError KeyError TypeError]]
+      default)))
+
+
 
 (defn c-not [var]
   (cond [(none? var) 0])
   (cond [(numeric? var)
          (cond [(zero? var) 0]
                [1])]))
+
+
+(defmain [&rest _]
+  (print (getitem [0 [1 2] 3] 1 2 :default 0)))

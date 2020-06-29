@@ -36,9 +36,9 @@ setup(
     version=__version__,
     install_requires=REQUIRED,
     packages=find_packages(),
-    # package_data={
-    #     'minghu6.algs': ['*.hy', '__pycache__/*'],
-    # },
+    package_data={
+        'minghu6.algs': ['*.hy', '__pycache__/*'],
+    },
     entry_points={
         'console_scripts': ['captcha=minghu6.tools.captcha.__main__:cli',
                             'ffmpeg-fix=minghu6.tools.ffmpeg_fix:cli',

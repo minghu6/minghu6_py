@@ -93,19 +93,16 @@ class CommandRunner(object):
     """Inspired by https://stackoverflow.com/questions/375427/non-blocking-read-on-a-subprocess-pipe-in-python"""
     ON_POSIX = 'posix' in sys.builtin_module_names
 
-    class Status(enum.Enum):
-        STDOUT = 0
-        STDERR = 1
 
     @classmethod
     def _enqueue_output(cls, process, out, queue):
         for line in iter(out.readline, b''):
             if out is process.stdout:
-                tag = cls.Status.STDOUT
+                tag = 'stdout'
             elif out is process.stderr:
-                tag = cls.Status.STDERR
+                tag = 'stderr'
             else:
-                tag = cls.Status.STDOUT
+                tag = 'stdout'
 
             line = CustomBytes(line)
             line.extra_attrs['tag'] = tag
@@ -121,7 +118,7 @@ class CommandRunner(object):
         if isinstance(cmd, list):
             cmd = ' '.join(cmd)
 
-        p = Popen('{cmd} && exit'.format(cmd=cmd), stdout=PIPE, stderr=PIPE, bufsize=1,
+        p = Popen('{cmd} && exit'.format(cmd=cmd), stdout=PIPE, stderr=PIPE,
                   close_fds=CommandRunner.ON_POSIX, shell=True)
         q = Queue()
         t_stdout = Thread(target=CommandRunner._enqueue_output, name='{cmd} fetch stdout'.format(cmd=cmd),
@@ -141,7 +138,8 @@ class CommandRunner(object):
             except Empty:
                 pass
             else:  # got line
-                yield line
+                status = line.extra_attrs['tag']
+                yield status, line
 
 
 # def daemon(cmd, name=None, logger=None, logpath='test.log'):
@@ -220,12 +218,12 @@ def auto_resume(cmd, logdir=os.curdir, name=None, logger=None, debug=True):
 
     while True:
         is_first_line = True
-        for line in CommandRunner.run(cmd):
+        for status, line in CommandRunner.run(cmd):
             if is_first_line:
                 is_first_line = False
                 logger.info('start `%s`'%cmd)
 
-            if line.extra_attrs['tag'] is CommandRunner.Status.STDOUT:
+            if status == 'stderr':
                 logger.debug(line)
             else:
                 logger.warning(line)
