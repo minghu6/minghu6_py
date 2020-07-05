@@ -10,24 +10,24 @@ from minghu6.algs import operator as op
 from minghu6.algs.decorator import assert_exception
 
 
-def test_getitem():
-    assert op.getitem(['a', 'b', 'c'], 2) == 'c'
-    assert op.getitem(['a', 'b'], 2, 'c') == 'c'
+def test_getone():
+    assert op.getone(['a', 'b', 'c'], 2) == 'c'
+    assert op.getone(['a', 'b'], 2, default='c') == 'c'
     ran = range(10)
     ran_copy = deepcopy(ran)
-    assert op.getitem(ran, 2) == 2
+    assert op.getone(ran, 2) == 2
     assert ran == ran_copy
-    assert op.getitem({'a':1, 'b':2}, 'b') == 2
+    assert op.getone({'a':1, 'b':2}, 'b') == 2
 
 
 @assert_exception(IndexError)
-def test_getitem_with_exception_index():
-    op.getitem(range(5), 5)
+def test_getone_with_exception_index():
+    op.getone(range(5), 5)
 
 
 @assert_exception(KeyError)
-def test_getitem_with_exception_key():
-    op.getitem({}, 'key')
+def test_getone_with_exception_key():
+    op.getone({}, 'key')
 
 
 def test_c_not():
@@ -39,7 +39,7 @@ def test_c_not():
 
 
 if __name__ == '__main__':
-    test_getitem()
+    test_getone()
     test_c_not()
-    test_getitem_with_exception_index()
-    test_getitem_with_exception_key()
+    test_getone_with_exception_index()
+    test_getone_with_exception_key()

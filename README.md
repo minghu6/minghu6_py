@@ -7,4 +7,12 @@
 
 # An Util Package
 
+## Install
+**install from pip**
+`python -m pip install minghu6`
 
+**install from source**
+`python -m pip install git+https://github.com/minghu6_py.git@develop`
+
+**install from local**
+`python ./lvse_install/auto_install.py`

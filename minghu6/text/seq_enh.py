@@ -1,7 +1,6 @@
 # coding: utf-8
 
 import re
-# In[15]:
 import sys
 
 __all__ = ['self_input',
@@ -92,13 +91,10 @@ def split(s, esc='\\', sep=' '):
 def underscore(name, strict=False):
     """
     TODO: rewrite using hy
-    :param name:
-    :param strict: default False
-     >>> underscore('IOError')
-     io_error
-     >>> underscore('IOError', strict=True)
-     i_o_error
-    :return:
+    >>> underscore('IOError')
+    io_error
+    >>> underscore('IOError', strict=True)
+    i_o_error
     """
     if strict:
         word = re.sub('([A-Z])([A-Z](^[A-Z])*)', r'\1_\2', name)
