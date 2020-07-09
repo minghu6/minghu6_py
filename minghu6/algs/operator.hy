@@ -12,6 +12,10 @@
          (cond [(zero? var) 0]
                [1])]))
 
+(setv builtin-first first)
+(defn first [arg]
+  (builtin-first arg))
+
 
 (defmain [&rest _]
   (print (getitem [0 [1 2] 3] 1 2 :default 0)))

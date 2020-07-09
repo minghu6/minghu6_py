@@ -65,8 +65,9 @@ target/
 
 #jupyte notebook check point
 .ipynb_checkpoints
-dist 
+dist
 exportToHTML/
 
 draft
 .vscode
+.noseids

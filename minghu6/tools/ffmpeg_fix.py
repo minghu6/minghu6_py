@@ -517,6 +517,7 @@ def cut(fn, output, start_time, end_time, debug=False):
     finally:
         if output:
             path2uuid(fn_tmp, d=True)
+            os.rename(output_tmp, output)
         else:
             os.rename(output_tmp, fn)
             path2uuid(fn_tmp, rename=False, d=True)
@@ -625,17 +626,16 @@ def cli():
     arguments = docopt(__doc__, version=minghu6.__version__)
 
     # output existed check
-    # if arguments['--output']:
-    #     output = arguments['--output']
+    if arguments['--output']:
+        output = arguments['--output']
 
-    #     if os.path.exists(output):
-    #         from minghu6.io.stdio import askoverride
+        if os.path.exists(output):
+            from minghu6.io.stdio import askoverride
 
-    #         if not askoverride(output, print_func=color.print_warn):
-    #             return
-    #         else:
-    #             #os.remove(output)
-    #             pass
+            if not askoverride(output, print_func=color.print_warn):
+                return
+            else:
+                os.remove(output)
 
     if arguments['info']:
         fn = arguments['<filename>']
@@ -697,6 +697,7 @@ def cli():
         end_time = arguments['<end-time>']
         output = arguments['--output']
         debug = arguments['--debug']
+
         cut(fn, output, start_time, end_time, debug)
 
     elif arguments['extract']:

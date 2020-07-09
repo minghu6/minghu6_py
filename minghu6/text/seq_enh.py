@@ -88,7 +88,7 @@ def split(s, esc='\\', sep=' '):
     return ''.join(ss).split(' ')
 
 
-def underscore(name, strict=False):
+def underscore(name, strict=False, case='lower'):
     """
     TODO: rewrite using hy
     >>> underscore('IOError')
@@ -104,7 +104,11 @@ def underscore(name, strict=False):
         word = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
         word = re.sub('([a-z0-9])([A-Z])', r'\1_\2', word)
 
-    word = word.replace("-", "_").lower()
+    if case == 'lower':
+        word = word.replace("-", "_").lower()
+    else:
+        word = word.replace("-", "_").upper()
+
     return word
 
 
