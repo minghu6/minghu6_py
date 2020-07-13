@@ -14,7 +14,7 @@ import urllib.request
 import os
 import re
 
-from minghu6.algs.metaclass import SingletonBasic
+from minghu6.algs.decorator import singleton
 from minghu6.http.request import headers
 from color import color
 from minghu6.etc.path import get_pre_path
@@ -27,24 +27,12 @@ __all__ = ['RESERVERD_DB_NAME',
 RESERVERD_DB_NAME = 'proxy.db'
 
 
-class singleton_dbname(SingletonBasic):
-    def __init__(self, *args, **kwargs):  # ??? TODO check it! (about metaclass and inherit)
-        super()
-
-    def _getkey(cls, *args, **kwargs):
-        dbname = args[0] if len(args) > 0 else kwargs['dbname']
-
-        if dbname == RESERVERD_DB_NAME:
-            dbname = None
-
-        return dbname
-
-
 pat = r"minghu6[\\/]"
 resource_path = os.path.join(get_pre_path(os.path.abspath(__file__), 3), 'resources')
 
 
-class proxy_ip(metaclass=singleton_dbname):
+@singleton
+class proxy_ip:
     def __init__(self, dbname=None, debug=False):
 
         self.debug = debug
@@ -79,6 +67,15 @@ class proxy_ip(metaclass=singleton_dbname):
                 self.parse_ip_port_region = proxy_ip.parse_ip_port_region_httpparser
             else:
                 self.parse_ip_port_region = proxy_ip.parse_ip_port_region_lxml
+
+    @classmethod
+    def _get_instance_key(cls, *args, **kwargs):
+        dbname = args[0] if len(args) > 0 else kwargs['dbname']
+
+        if dbname == RESERVERD_DB_NAME:
+            dbname = None
+
+        return dbname
 
     def __del__(self):
         if hasattr(self, 'conn'):

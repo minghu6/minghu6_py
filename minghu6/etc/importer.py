@@ -35,11 +35,7 @@ def check_module(module_name, install_name=''):
     except ImportError:
         color.print_warn(module_name, 'Not Exists')
 
-        pip_name = ''
-        if ispython3():
-            pip_name = 'pip3'
-        elif ispython2():
-            pip_name = 'pip'
+        pip_name = 'python -m pip'
 
         color.print_info('Now, try to install through {}, wait please...:)'.format(pip_name))
 

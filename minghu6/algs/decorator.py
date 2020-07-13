@@ -302,6 +302,9 @@ def singleton(cls):
 
         return instances[instance_key]
 
+    for method_name in filter(lambda name: not (name.startswith('__') and name.endswith('__')), dir(cls)):
+        setattr(_singleton, method_name, getattr(cls, method_name))
+
     return _singleton
 
 

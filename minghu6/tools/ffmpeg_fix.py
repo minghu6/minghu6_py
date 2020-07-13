@@ -19,7 +19,7 @@ Usage:
   ffmpeg_fix extract video <filename> --output=<output>
   ffmpeg_fix extract subtitle <filename> --output=<output>
   ffmpeg_fix extract frame <filename> <start-time> --output=<output>
-  ffmpeg_fix compress video <pattern>... [--preset=<preset>] [--crf=<crf>] [--output-postfix=<output_postfix>]
+  ffmpeg_fix compress video <pattern>... [--preset=<preset>] [--crf=<crf>] [--output-postfix=<output-postfix>]
   ffmpeg_fix trim <title-type> <pattern>...
 
 Options:
@@ -46,7 +46,7 @@ Options:
   --size=<size>         video size, such as "1080x720"
   --preset=<preset>     compress speed: ultrafast|superfast|veryfast|faster|fast|medium|slow|slower|veryslow|placebo)
                         don't recommend veryslow and placebo, [default: medium]
-  --output-postfix=<output_postfix>        [default: compressed]
+  --output-postfix=<output-postfix>        [default: compressed]
   --crf=<crf>           compressed output video quality from 0-51 recommend (480p 20, 720p 17, 1080p 16)
                         [default: 23]
 
