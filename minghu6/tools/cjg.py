@@ -2,7 +2,7 @@
 https://www.tangzhekan2.cc/
 使用腾讯的OCR进行最关键的图片识别，我是没想到这么简单的图片，都不能用tesseract、cnocr、Baidu等常用字识别都搞不定
 只有腾讯的普通及以上文字识别才好使, 但是也认不全
-但腾讯的好贵，1000次/84元
+而且腾讯的好贵，1000次/84元
 """
 
 import requests
@@ -21,6 +21,7 @@ import minghu6
 
 from urllib.parse import urlparse, urljoin
 from os.path import basename, join as pathjoin
+from pathlib import Path
 import os
 import json
 from types import MethodType
@@ -40,8 +41,10 @@ TEXT_DATABASE_DIR =  pathjoin(CONFIG_DIR, 'texts')
 PACKAGE_PARENT_DIR = get_pre_path(__file__, plevel=3)
 RESOURCES_DIR = pathjoin(PACKAGE_PARENT_DIR, 'resources')
 IMG2CHAR_CONFIG_DIR = pathjoin(RESOURCES_DIR, 'cangjingge')
+CLEAN_PAT_CONFIG_DIR = IMG2CHAR_CONFIG_DIR
 
 BASE_DOMAIN = 'https://www.tangzhekan2.cc'
+
 
 VERBOSE = False
 
@@ -104,6 +107,11 @@ class Img2CharConfig(Config):
 
         for k, v in self._config_dict.items():
             self._config_dict[k] = v.strip()
+
+
+class CleanPatConfig(Config):
+    def __init__(self):
+        super().__init__('clean_pat.json', config_dir=CLEAN_PAT_CONFIG_DIR)
 
 
 class Text2PathConfig(Config):
@@ -195,11 +203,27 @@ PatchType = OrderedDict[ChapterNameType, Tuple[UrlType, LineNoType]]
 OriginContentType = List[str]
 
 CHAPTER_TITLE_PAT = re.compile('[*]{2}.*[\d|一|二|三|四|五|六|七|八|九|十]+.*[*]{2}')
-CLEAN_PAT_LIST = [
-    re.compile('\s*最新找回４Ｆ４Ｆ４Ｆ．ＣＯＭ[\s\n]*'),
-    re.compile('\s*最新找回4F4F4F,C0M[\s\n]*'),
-    re.compile('\s*4F4F4F.C0M[\s\n]*')
-]
+
+# 如果这个表长度超过20，我就把它放到配置文件里
+# build clean pat list
+def gen_clean_pat_list() -> List[Tuple[re.Pattern, str]]:
+    clean_pat_config = CleanPatConfig()
+
+    if normal_lines := clean_pat_config.get('normal_lines'):
+        clean_pat_list = [(f'^(.*)(\s*{line}\s*)(.*)$', r'\1\3') for line in normal_lines]
+    else:
+        clean_pat_list = []
+
+
+    return [(re.compile(item[0]), item[1]) for item in clean_pat_list]
+
+
+CLEAN_PAT_LIST = gen_clean_pat_list()
+
+
+def list_local_texts() -> List[Path]:
+    return [Path(TEXT_DATABASE_DIR, fn)  for fn in filter(lambda fn: fn.endswith('.txt'), os.listdir(TEXT_DATABASE_DIR))]
+
 
 class CangJingGe:
     def __init__(self, text_name, outdir=None):
@@ -265,8 +289,10 @@ class CangJingGe:
 
     @staticmethod
     def trip_text(text):
-        for clean_pat in CLEAN_PAT_LIST:
-            text = re.sub(clean_pat, '', text)
+        for clean_pat, rep in CLEAN_PAT_LIST:
+            line_list = text.split('\n')
+            line_list = [line.lstrip() for line in line_list]
+            text = '\n'.join([re.sub(clean_pat, rep, line) for line in line_list])
 
         return text
 
@@ -384,7 +410,8 @@ class CangJingGe:
             with open(output_path, 'w', newline='\n') as fp:
                 fp.write(origin_content)
 
-        color.print_ok(f'Added {len(chapters_patch)} chapters.')
+        color.print_info(f'Added {len(chapters_patch)} chapters.')
+        color.print_ok(f'{self.text_name} was updated.')
 
     def fetch_chapter_content(self, page_url, next_part_links):
         bs_obj = get_page(page_url)
@@ -432,18 +459,21 @@ def cli():
     Usage:
       cjg list text-registries
       cjg add text-registry <text-name> <text-path>
-      cjg rm text-registry <text-name>
+      cjg rm text-registry <text-name>...
       cjg view img2char
       cjg update text <text-name>... [--outdir=<outdir>] [-n=<n>] [--verbose]
+      cjg reclean text [--outdir=<outdir>]
 
     Options:
-      list text-   view all text-name-to-path mapping
+      list text             view all text-name-to-path mapping
       add text-mappings     add text-name-to-path mapping
       rm text-mappings      remove item by <text-name?
+      reclean text          rerun text clean using current clean_pat.json
 
       <text-path>  text relative path (for BASE_DOMAIN), sucha as '/14/14438/'
       -o --outdir=<outdir>
       -n=<n>       int, number
+      <text-name>  place-holder-- "all" is supported!
 
     """
     arguments = docopt(USAGE, version=minghu6.__version__)
@@ -466,14 +496,20 @@ def cli():
         text_config.update({text_name: path})
 
     elif arguments['rm'] and arguments['text-registry']:
-        text_name = arguments['<text-name>']
-
         text_config = Text2PathConfig()
-        text_path = text_config.pop(text_name)
-        color.print_err(f'removed {text_name}: {text_path}')
+
+        for text_name in arguments['<text-name>']:
+            text_path = text_config.pop(text_name)
+            text_config.save()
+            color.print_err(f'removed {text_name}: {text_path}')
 
     elif arguments['update'] and arguments['text']:
-        text_names = arguments['<text-name>']
+        if 'all' in arguments['<text-name>']:
+            text_config = Text2PathConfig()
+            text_names = text_config.keys()
+        else:
+            text_names = arguments['<text-name>']
+
         outdir = arguments['--outdir']
 
         globals().update({'VERBOSE': arguments['--verbose']})
@@ -488,6 +524,29 @@ def cli():
         for text_name in text_names:
             cangjingge = CangJingGe(text_name, outdir)
             cangjingge.pull(n)
+
+    elif arguments['reclean'] and arguments['text']:
+        outdir = arguments['--outdir']
+
+        for text in list_local_texts():
+            with open(text) as fp:
+                origin_content = fp.read()
+
+            origin_content_len = len(origin_content)
+
+            cleaned_content = CangJingGe.trip_text(origin_content)
+            cleaned_content_len = len(cleaned_content)
+
+            with open(text, 'w') as fp:
+                fp.write(cleaned_content)
+
+            if outdir:
+                with open(pathjoin(outdir, text.name), 'w') as fp:
+                    fp.write(cleaned_content)
+
+            color.print_info(f'{text.name} has been cleaned {origin_content_len - cleaned_content_len} chars.')
+
+
     elif arguments['view'] and arguments['img2char']:
         img2char_config = Img2CharConfig()
 

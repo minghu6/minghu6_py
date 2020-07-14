@@ -15,6 +15,12 @@ from minghu6.algs.userdict import remove_key
 __all__ = ['path2uuid', 'Path2UUID']
 
 
+def sqlite_escape(s):
+    s = s.replace("'", "''")
+
+    return s
+
+
 def path2uuid(i, d=False, db=None, rename=True, quiet=False):
     """
 
@@ -41,6 +47,8 @@ def path2uuid(i, d=False, db=None, rename=True, quiet=False):
     cur = conn.cursor()
 
     _, ext = os.path.splitext(os.path.basename(i))
+    escaped_i = sqlite_escape(i)
+
     if not d:
 
         tmp_base = os.path.join(os.path.dirname(i),
@@ -49,7 +57,7 @@ def path2uuid(i, d=False, db=None, rename=True, quiet=False):
 
         tmp = tmp_base + ext
         try:
-            insert_sql = "INSERT INTO Path2UUID VALUES ('%s', '%s')" % (i, tmp)
+            insert_sql = "INSERT INTO Path2UUID VALUES ('%s', '%s')" % (escaped_i, tmp)
             try:
                 cur.execute(insert_sql)
             except sqlite3.IntegrityError:
@@ -70,7 +78,7 @@ def path2uuid(i, d=False, db=None, rename=True, quiet=False):
             return tmp
 
     else:
-        select_sql = """SELECT I FROM Path2UUID WHERE Tmp='%s' """ % i
+        select_sql = """SELECT I FROM Path2UUID WHERE Tmp='%s' """ % escaped_i
 
         cur.execute(select_sql)
         res = cur.fetchone()
@@ -91,7 +99,7 @@ def path2uuid(i, d=False, db=None, rename=True, quiet=False):
                     else:
                         raise
 
-            delete_sql = """DELETE FROM Path2UUID WHERE Tmp='%s' """ % i
+            delete_sql = """DELETE FROM Path2UUID WHERE Tmp='%s' """ % escaped_i
             cur.execute(delete_sql)
         except:
             raise
