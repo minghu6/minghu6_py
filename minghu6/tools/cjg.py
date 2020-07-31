@@ -29,6 +29,7 @@ from collections import OrderedDict
 from typing import Mapping, Tuple, Union, TypeVar, OrderedDict, List
 import re
 import traceback
+import atexit
 
 
 # Local、Origin  本地数据库
@@ -55,7 +56,6 @@ except ImportError:
 else:
     PARSER = 'lxml'
 
-check_module('tencentcloud', 'tencentcloud-sdk-python')
 
 def getone_config(config_path):
     if os.path.exists(config_path):
@@ -90,15 +90,14 @@ class Config:
             method = LexClosureMethod(method_name)
             setattr(self, method_name, MethodType(method, self))
 
+        atexit.register(self.save)
+
     def save(self):
         with open(self._config_path, 'w') as fp:
             json.dump(self._config_dict, fp, indent=4)
 
     def __len__(self):
         return self._config_dict.__len__()
-
-    def __del__(self):
-        self.save()
 
 
 class Img2CharConfig(Config):
@@ -124,14 +123,16 @@ class TencentCloudAppConfig(Config):
         super().__init__('tencent_cloud_app.json')
 
 
-from tencentcloud.common import credential
-from tencentcloud.common.profile.client_profile import ClientProfile
-from tencentcloud.common.profile.http_profile import HttpProfile
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.ocr.v20181119 import ocr_client, models
 class TencentOcr:
-    def __init__(self):
-        tencent_cloud_app_config = TencentCloudAppConfig()
+    def __init__(self, config=TencentCloudAppConfig()):
+        tencent_cloud_app_config = config
+
+        check_module('tencentcloud', 'tencentcloud-sdk-python')
+        from tencentcloud.common import credential
+        from tencentcloud.common.profile.client_profile import ClientProfile
+        from tencentcloud.common.profile.http_profile import HttpProfile
+        from tencentcloud.ocr.v20181119 import ocr_client
+
 
         secret_id = tencent_cloud_app_config.get('secret_id')
         secret_key = tencent_cloud_app_config.get('secret_key')
@@ -148,6 +149,9 @@ class TencentOcr:
         self.client = client
 
     def request(self, img_url):
+        from tencentcloud.ocr.v20181119 import models
+
+
         req = models.GeneralAccurateOCRRequest()
         req.ImageUrl = img_url
         retry = 2
@@ -204,7 +208,7 @@ OriginContentType = List[str]
 
 CHAPTER_TITLE_PAT = re.compile('[*]{2}.*[\d|一|二|三|四|五|六|七|八|九|十]+.*[*]{2}')
 
-# 如果这个表长度超过20，我就把它放到配置文件里
+
 # build clean pat list
 def gen_clean_pat_list() -> List[Tuple[re.Pattern, str]]:
     clean_pat_config = CleanPatConfig()
@@ -230,7 +234,7 @@ class CangJingGe:
         ensure_dir_exists(CONFIG_DIR)
         ensure_dir_exists(TEXT_DATABASE_DIR)
 
-        self.ocr = TencentOcr()
+        self.ocr = TencentOcr() if TencentCloudAppConfig() else None
 
         self.text2path_config = Text2PathConfig()
         self.text_name = text_name
@@ -273,7 +277,7 @@ class CangJingGe:
             if local_chapter_item is None or local_chapter_name != upstream_chapter_name:
                 offset += 1
 
-                if item := getone(local_chapters_list, local_chapter_index + 1) is not None:
+                if item := getone(local_chapters_list, local_chapter_index + 1):
                     insert_index = item[1]
                 else:
                     insert_index = 'tail'
@@ -448,7 +452,6 @@ class CangJingGe:
 
 def common_exception_handler(ex):
     color.print_err(ex)
-    traceback.print_exception(ex)
 
 
 @cli_handle_exception(common_exception_handler, [GetPageError])
@@ -473,7 +476,7 @@ def cli():
       <text-path>  text relative path (for BASE_DOMAIN), sucha as '/14/14438/'
       -o --outdir=<outdir>
       -n=<n>       int, number
-      <text-name>  place-holder-- "all" is supported!
+      <text-name>  place-holder, "all" is supported!
 
     """
     arguments = docopt(USAGE, version=minghu6.__version__)
