@@ -8,6 +8,7 @@ About Path(File,Directory,Atty,Link etc)
 
 import os
 import ctypes
+import warnings
 
 from minghu6.etc.version import iswin
 
@@ -45,6 +46,8 @@ def get_cwd_pre_dir(n):
 
 
 def get_pre_path(path, plevel=1):
+    warnings.warn("use pathlib.Path(path).parents[plevel-1] instead.", DeprecationWarning)
+
     def get_parent_dir(path):
         """
         get one level before path
@@ -84,6 +87,8 @@ def add_postfix(fn, postfix, sep='_'):
 
 
 def get_home_dir():
+
+    warnings.warn("use pathlib.Path.home instead.", DeprecationWarning)
     return os.path.expanduser('~')
 
 

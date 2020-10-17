@@ -12,7 +12,6 @@ from color import color
 
 from minghu6.graphic.captcha.get_image import get_image
 from minghu6.http.request import headers
-from minghu6.etc.path import get_home_dir, ensure_dir_exists, get_pre_path
 from minghu6.etc.importer import check_module
 from minghu6.algs.operator import getone
 from minghu6.algs.decorator import cli_handle_exception
@@ -20,8 +19,8 @@ from minghu6.text.pattern import han
 import minghu6
 
 from urllib.parse import urlparse, urljoin
-from os.path import basename, join as pathjoin
 from pathlib import Path
+from collections import defaultdict
 import os
 import json
 from types import MethodType
@@ -35,14 +34,14 @@ import atexit
 # Local、Origin  本地数据库
 # Upstream       网站
 
-HOME_DIR = get_home_dir()
-CONFIG_DIR = pathjoin(HOME_DIR, '.cangjingge')
-TEXT_DATABASE_DIR =  pathjoin(CONFIG_DIR, 'texts')
-
-PACKAGE_PARENT_DIR = get_pre_path(__file__, plevel=3)
-RESOURCES_DIR = pathjoin(PACKAGE_PARENT_DIR, 'resources')
-IMG2CHAR_CONFIG_DIR = pathjoin(RESOURCES_DIR, 'cangjingge')
+HOME_DIR = Path.home()
+CONFIG_DIR = HOME_DIR.joinpath('.cangjingge')
+TEXT_DATABASE_DIR = CONFIG_DIR.joinpath('texts')
+PACKAGE_PARENT_DIR = Path(__file__).parents[2]
+RESOURCES_DIR = PACKAGE_PARENT_DIR.joinpath('resources')
+IMG2CHAR_CONFIG_DIR = RESOURCES_DIR.joinpath('cangjingge')
 CLEAN_PAT_CONFIG_DIR = IMG2CHAR_CONFIG_DIR
+HANDIMG_DIR = IMG2CHAR_CONFIG_DIR.joinpath('hand_imgs')
 
 BASE_DOMAIN = 'https://www.tangzhekan2.cc'
 
@@ -57,9 +56,39 @@ else:
     PARSER = 'lxml'
 
 
-def getone_config(config_path):
-    if os.path.exists(config_path):
-        with open(config_path) as fp:
+# build img database
+def build_img_dict():
+    img_dict = defaultdict(list)
+    HANDIMG_DIR_PATH =  Path(HANDIMG_DIR)
+    for child in Path(HANDIMG_DIR).iterdir():
+        with child.open('rb') as fr:
+            img_dict[child.stem[0]].append(fr.read())
+
+    return img_dict
+
+
+def search_in_img_dict(img_dict, img_url):
+    while True:
+        try:
+            r = requests.get(img_url, headers=headers, timeout=5)
+        except Exception as ex:
+            color.print_err(str(ex) + '  ' + img_url)
+        else:
+            break
+
+    if r.status_code != 200:
+        raise GetPageError(r)
+
+    img_content = r.content
+
+    for key, vlist in img_dict.items():
+        if img_content in vlist:
+            return key
+
+
+def getone_config(config_path: Path):
+    if config_path.exists():
+        with config_path.open() as fp:
             config_dict = json.load(fp)
     else:
         config_dict = {}
@@ -68,8 +97,8 @@ def getone_config(config_path):
 
 
 class Config:
-    def __init__(self, fn, config_dir=CONFIG_DIR):
-        self._config_path = pathjoin(config_dir, fn)
+    def __init__(self, fn, config_dir:Path=CONFIG_DIR):
+        self._config_path = config_dir.joinpath(fn)
         self._config_dict = getone_config(self._config_path)
 
         # 感觉自己在写旧式的Java，TM的匿名内部类都出来了，没有闭包绝对是Python的固有缺陷！！！
@@ -93,7 +122,7 @@ class Config:
         atexit.register(self.save)
 
     def save(self):
-        with open(self._config_path, 'w') as fp:
+        with self._config_path.open('w') as fp:
             json.dump(self._config_dict, fp, indent=4)
 
     def __len__(self):
@@ -150,18 +179,23 @@ class TencentOcr:
 
     def request(self, img_url):
         from tencentcloud.ocr.v20181119 import models
+        from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
 
 
-        req = models.GeneralAccurateOCRRequest()
+        req = models.GeneralHandwritingOCRRequest()
+        #req = models.GeneralAccurateOCRRequest()
         req.ImageUrl = img_url
-        retry = 2
+        retry = 1
 
         while retry:
             try:
                 resp = self.client.GeneralAccurateOCR(req)
-            except Exception as ex:
+
+            except TencentCloudSDKException as ex:
+                print(str(ex)+'  ' + img_url)
+                if ex.get_code() == 'FailedOperation.DownLoadError':
+                    continue
                 retry -= 1
-                print(ex)
 
                 if retry < 0:
                     raise ex
@@ -230,9 +264,9 @@ def list_local_texts() -> List[Path]:
 
 
 class CangJingGe:
-    def __init__(self, text_name, outdir=None):
-        ensure_dir_exists(CONFIG_DIR)
-        ensure_dir_exists(TEXT_DATABASE_DIR)
+    def __init__(self, text_name, outdir:Path=None):
+        CONFIG_DIR.mkdir(exist_ok=True)
+        TEXT_DATABASE_DIR.mkdir(exist_ok=True)
 
         self.ocr = TencentOcr() if TencentCloudAppConfig() else None
 
@@ -248,18 +282,20 @@ class CangJingGe:
 
         self.outdir = outdir
         if outdir:
-            ensure_dir_exists(outdir)
+            outdir.mkdir(exist_ok=True)
 
-        self.database_text_path = pathjoin(TEXT_DATABASE_DIR, text_name) + '.txt'
-        if not os.path.exists(self.database_text_path):
-            with open(self.database_text_path, 'w'):
+        self.database_text_path = TEXT_DATABASE_DIR.joinpath(text_name + '.txt')
+        if not self.database_text_path.exists():
+            with self.database_text_path.open('w'):
                 pass
             self.origin_contents = []
         else:
-            with open(self.database_text_path, 'r') as fp:
+            with self.database_text_path.open('r') as fp:
                 self.origin_contents = fp.readlines()
 
         self.imgtag2char_failed = False
+        self.img_dict = build_img_dict()
+
 
     @staticmethod
     def diff_local_upstream(local_chapters: LocalChapterType,
@@ -348,20 +384,27 @@ class CangJingGe:
 
     def imgtag2char(self, img_tag):
         src = img_tag['src']
-        key = basename(src)
+        key = Path(src).name
         if (char := self.img2char_config.get(key)) is None:
             img_url = urljoin(BASE_DOMAIN, src)
+
+            if char := search_in_img_dict(self.img_dict, img_url):
+                return char
+
             try:
                 char = self.ocr.request(img_url).strip()
 
                 if not re.match(han, char):
                     raise Exception(f'ocr recognize failed{char}\n{img_url}')
 
-            except:
+            except Exception as ex:
+                if VERBOSE:
+                    color.print_err(ex)
                 # 直接交互解决不识别的字符
                 char = CangJingGe.input_imgchar(img_url)
                 self.img2char_config.update({key: char})
                 self.img2char_config.save()
+                self.img_dict = build_img_dict()
                 # self.imgtag2char_failed = True
                 # char = '<place-holder>'
                 # color.print_err(img_url)
@@ -406,12 +449,12 @@ class CangJingGe:
             return
 
         origin_content = ''.join(origin_contents)
-        with open(self.database_text_path, 'w', newline='\n') as fp:
+        with open(self.database_text_path, 'w', newline='\n', errors='ignore') as fp:
             fp.write(origin_content)
 
         if self.outdir:
-            output_path = pathjoin(self.outdir, self.text_name) + '.txt'
-            with open(output_path, 'w', newline='\n') as fp:
+            output_path = self.outdir.joinpath(self.text_name + '.txt')
+            with self.outdir.open('w', newline='\n') as fp:
                 fp.write(origin_content)
 
         color.print_info(f'Added {len(chapters_patch)} chapters.')
@@ -517,7 +560,7 @@ def cli():
 
         globals().update({'VERBOSE': arguments['--verbose']})
 
-        globals().update({'VERBOSE': True})  # 还是开着放心
+        # globals().update({'VERBOSE': True})  # 还是开着放心
 
         n = arguments['-n']
 
@@ -532,7 +575,7 @@ def cli():
         outdir = arguments['--outdir']
 
         for text in list_local_texts():
-            with open(text) as fp:
+            with text.open() as fp:
                 origin_content = fp.read()
 
             origin_content_len = len(origin_content)
@@ -544,7 +587,7 @@ def cli():
                 fp.write(cleaned_content)
 
             if outdir:
-                with open(pathjoin(outdir, text.name), 'w') as fp:
+                with Path(outdir).joinpath(text.name).open('w') as fp:
                     fp.write(cleaned_content)
 
             color.print_info(f'{text.name} has been cleaned {origin_content_len - cleaned_content_len} chars.')
