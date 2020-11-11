@@ -377,40 +377,41 @@ def merge(pattern_list, output, type, **other_kwargs):
     merge_file_tmp_list2 = []
 
     if type == 'video':
-        # check if the video can be merge
-        FileInfo = namedtuple('FileInfo', ['width', 'height'])
-        merge_file_info_list = []
-        for fn in merge_file_tmp_list:
-            json_obj = load_video_info_json(fn)
-            video_site, audio_site = get_video_audio_info_site_injson(json_obj)
-            codec_name = json_obj['streams'][video_site]['codec_name']
-            width = int(json_obj['streams'][video_site]['width'])
-            height = int(json_obj['streams'][video_site]['height'])
+        pass
+        ## check if the video can be merge
+        # FileInfo = namedtuple('FileInfo', ['width', 'height'])
+        # merge_file_info_list = []
+        # for fn in merge_file_tmp_list:
+        #     json_obj = load_video_info_json(fn)
+        #     video_site, audio_site = get_video_audio_info_site_injson(json_obj)
+        #     codec_name = json_obj['streams'][video_site]['codec_name']
+        #     width = int(json_obj['streams'][video_site]['width'])
+        #     height = int(json_obj['streams'][video_site]['height'])
 
-            merge_file_info_list.append(FileInfo(width, height))
+        #     merge_file_info_list.append(FileInfo(width, height))
 
-        if not each_same(merge_file_info_list, key=lambda x: (x.width, x.height)):
-            color.print_err('width, height, should be same of all video')
+        # if not each_same(merge_file_info_list, key=lambda x: (x.width, x.height)):
+        #     color.print_err('width, height, should be same of all video')
 
-            min_width = sorted(merge_file_info_list, key=lambda x: x.width)[0].width
-            min_height = sorted(merge_file_info_list, key=lambda x: x.height)[0].height
-            min_resolution = '%dx%d' % (min_width, min_height)
-            min_fps = sorted(merge_file_info_list, key=lambda x: x.fps)[0].fps
+        #     min_width = sorted(merge_file_info_list, key=lambda x: x.width)[0].width
+        #     min_height = sorted(merge_file_info_list, key=lambda x: x.height)[0].height
+        #     min_resolution = '%dx%d' % (min_width, min_height)
+        #     min_fps = sorted(merge_file_info_list, key=lambda x: x.fps)[0].fps
 
-            color.print_warn('all_to_resolution: %s' % min_resolution)
-            color.print_warn('all_to_fps: %s' % min_fps)
-            if askyesno('convert to fix?'):
-                merge_file_tmp_list2 = list(map(lambda x: add_postfix(x, 'tmp'), merge_file_tmp_list))
+        #     color.print_warn('all_to_resolution: %s' % min_resolution)
+        #     color.print_warn('all_to_fps: %s' % min_fps)
+        #     if askyesno('convert to fix?'):
+        #         merge_file_tmp_list2 = list(map(lambda x: add_postfix(x, 'tmp'), merge_file_tmp_list))
 
-                def tmp(fn_tuple):
-                    convert(*fn_tuple, size=min_resolution, fps=min_fps)
+        #         def tmp(fn_tuple):
+        #             convert(*fn_tuple, size=min_resolution, fps=min_fps)
 
-                list(map(lambda x: tmp(x),
-                         zip(merge_file_tmp_list, merge_file_tmp_list2)))
+        #         list(map(lambda x: tmp(x),
+        #                  zip(merge_file_tmp_list, merge_file_tmp_list2)))
 
-            else:
+        #     else:
 
-                return
+        #         return
 
     elif type == 'audio':
         pass

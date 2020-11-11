@@ -182,8 +182,8 @@ class TencentOcr:
         from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
 
 
-        req = models.GeneralHandwritingOCRRequest()
-        #req = models.GeneralAccurateOCRRequest()
+        #req = models.GeneralHandwritingOCRRequest()
+        req = models.GeneralAccurateOCRRequest()
         req.ImageUrl = img_url
         retry = 1
 
