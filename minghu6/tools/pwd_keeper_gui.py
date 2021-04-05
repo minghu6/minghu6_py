@@ -3,7 +3,7 @@ import PySimpleGUI as sg
 
 from minghu6.etc.path import get_home_dir
 from minghu6.text.seq_enh import split_whitespace
-from minghu6.algs.operator import getitem
+from minghu6.algs.operator import getone
 from minghu6.tools.pwd_keeper import PwdKeeper
 
 
@@ -66,8 +66,8 @@ def gui():
     #     # check_username = values['check_username']
     #     # username = values['username']
 
-    path = '/home/minghu6/code/accounts/pwd_minghu6.txt'
-    pwd = '19678zy'
+    path = '/home/minghu6/coding/accounts/pwd_minghu6.txt'
+    pwd = ''
     check_username = False
     username = ''
 
@@ -107,7 +107,8 @@ def gui():
                     sg.PopupError(repr(ex))
                     continue
                 else:
-                    print(items)
+                    #print(items)
+                    pass
 
                 content = label_content_to_multiline(items)
                 label_content_window.Update(content)

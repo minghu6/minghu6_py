@@ -500,7 +500,7 @@ def cut(fn, output, start_time, end_time, debug=False):
             color.print_err('end-time:%s is before than start-time:%s' % (end_time, start_time))
             raise
 
-        cmd = 'ffmpeg -ss %d -i "%s" -t %d -c:v copy -c:a copy "%s" ' \
+        cmd = 'ffmpeg -ss %d -i "%s" -t %d -c:v copy -c:a copy -avoid_negative_ts make_zero "%s" ' \
               % (start_time_int, fn_tmp, duration, output_tmp)
 
         for status, line in CommandRunner.run(cmd):
