@@ -13,8 +13,9 @@ from minghu6.etc.version import iswin, islinux
 def where_pth():
     if islinux():
         for path in sys.path:
-            if os.path.basename(path) == 'dist-packages':
+            if os.path.basename(path) in ('dist-packages', 'site-packages'):
                 return path
+        raise Exception(f'Packages Stub Not Found!\n'+"\n".join(sys.path))
 
     elif iswin():
         return os.path.split(sys.executable)[0]

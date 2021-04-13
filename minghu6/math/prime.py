@@ -35,41 +35,56 @@ def fast_exp_mod(b, e, m):
     return result
 
 
+# def isprime(n):
+#     def prime_test(n):
+
+#         if n < 2:
+#             return 'error'
+#         elif n == 3:
+#             return 'prime'
+
+#         q = n - 1
+#         k = 0
+#         # Find k, q, satisfied 2^k * q = n - 1
+#         while q % 2 == 0:
+#             k += 1
+#             q /= 2
+#         a = random.randint(2, n - 2)
+#         # If a^q mod n= 1, n maybe is a prime number
+#         if fast_exp_mod(a, q, n) == 1:
+#             return "inconclusive"
+#         # If there exists j satisfy a ^ ((2 ^ j) * q) mod n == n-1, n maybe is a prime number
+#         for j in range(0, k):
+#             if fast_exp_mod(a, (2 ** j) * q, n) == n - 1:
+#                 return "inconclusive"
+#         # a is not a prime number
+#         return "composite"
+
+#     if n <= 3:
+#         return n > 1
+
+#     if n % 2 == 0:
+#         return False
+
+#     # If n satisfy primeTest 10 times, then n should be a prime number
+#     for i in range(5):
+#         if prime_test(n) == "composite":
+#             return False
+
+#     return True
+
 def isprime(n):
-    def prime_test(n):
-
-        if n < 2:
-            raise Exception('Argument Error')
-        elif n == 3:
-            return 'prime'
-
-        q = n - 1
-        k = 0
-        # Find k, q, satisfied 2^k * q = n - 1
-        while q % 2 == 0:
-            k += 1
-            q /= 2
-        a = random.randint(2, n - 2)
-        # If a^q mod n= 1, n maybe is a prime number
-        if fast_exp_mod(a, q, n) == 1:
-            return "inconclusive"
-        # If there exists j satisfy a ^ ((2 ^ j) * q) mod n == n-1, n maybe is a prime number
-        for j in range(0, k):
-            if fast_exp_mod(a, (2 ** j) * q, n) == n - 1:
-                return "inconclusive"
-        # a is not a prime number
-        return "composite"
-
-    if n % 2 == 0:
+    """Primality test using 6k+-1 optimization."""
+    if n <= 3:
+        return n > 1
+    if n % 2 == 0 or n % 3 == 0:
         return False
-
-    # If n satisfy primeTest 10 times, then n should be a prime number
-    for i in range(10):
-        if prime_test(n) == "composite":
+    i = 5
+    while i ** 2 <= n:
+        if n % i == 0 or n % (i + 2) == 0:
             return False
-
+        i += 6
     return True
-
 
 def find_prime_random(end, start=0):
     while True:
